@@ -1,5 +1,6 @@
 <?php
 class auth_require_group_membership extends rcube_plugin {
+
     public $task = 'login';
     public $noajax = true;
     public $noframe = true;
@@ -13,22 +14,32 @@ class auth_require_group_membership extends rcube_plugin {
     private $is_local;
     private $log_file;
 
-    function init(){
-        $this->rc = rcmail::get_instance();
+    private $prepared = false;
+
+    private function prepare(){
+        if($this->prepared) return;
         $this->load_config();
         $this->log_file = $this->rc->config->get('auth_require_group_membership_debug_log');
         $this->server_name = strtolower(getenv('HTTP_HOST'));
         $this->remote_addr = getenv('REMOTE_ADDR');
         $this->is_local = substr($this->remote_addr,0,4) === "192." || substr($this->remote_addr,0,3) === "10.";
+        $this->prepared = true;
+    }
+
+    public function init(){
+        $this->rc = rcmail::get_instance();
         $this->add_hook('authenticate', array($this, 'before_login'));
         $this->add_hook('login_failed', array($this, 'on_login_failed'));
     }
 
-    function before_login($data){
+    public function before_login($data){
 
-        $this->write_log('------------ new request');
+        $this->prepare();
 
-        if($this->server_name == '' || !in_array($this->server_name, $this->rc->config->get('auth_require_group_membership_server_names'))){
+        $this->write_log('------------ new request to ' . $this->server_name);
+        $validates_hosts = $this->rc->config->get('auth_require_group_membership_server_names');
+        $this->write_log('checking against ' . join(",", $validates_hosts));
+        if($this->server_name == '' || !in_array($this->server_name, $validates_hosts)){
             return $this->check_complete($data, true, '', 'host not in [auth_require_group_membership_server_names]');
         };
 
@@ -120,7 +131,21 @@ class auth_require_group_membership extends rcube_plugin {
         }
     }
 
-    function check_complete($data, $success=true, $human_reason='', $details = 'NOT_SET'){
+    public function on_login_failed($data){
+
+        $this->prepare();
+
+        $user = isset($data['user']) ? $data['user'] : 'NOT_SET';
+        $host = isset($data['host']) ? $data['host'] : 'NOT_SET';
+        $code = isset($data['code']) ? $data['code'] : 'NOT_SET';
+        $this->rc->write_log($this->rc->config->get('auth_require_group_membership_login_log'), "FAILED LOGIN for $user at host $host, reason: $code");
+        return true;
+    }
+
+    public function check_complete($data, $success=true, $human_reason='', $details = 'NOT_SET'){
+
+        $this->prepare();
+
         $data['abort'] = $success !== true;
         $data['error'] = $human_reason;
         if($this->ldap_connected === true) $this->ldap->close();
@@ -131,21 +156,13 @@ class auth_require_group_membership extends rcube_plugin {
     }
 
 
-    function write_log($msg){
+    private function write_log($msg){
         $this->rc->write_log($this->log_file, $msg);
     }
 
-    function debug_ldap($level, $msg){
+    private function debug_ldap($level, $msg){
         $msg = implode("\n", $msg);
         $this->write_log($msg);
-    }
-
-    function on_login_failed($data){
-        $user = isset($data['user']) ? $data['user'] : 'NOT_SET';
-        $host = isset($data['host']) ? $data['host'] : 'NOT_SET';
-        $code = isset($data['code']) ? $data['code'] : 'NOT_SET';
-        $this->rc->write_log($this->rc->config->get('auth_require_group_membership_login_log'), "FAILED LOGIN for $user at host $host, reason: $code");
-        return true;
     }
 }
 ?>

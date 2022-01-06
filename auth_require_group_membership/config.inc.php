@@ -5,10 +5,10 @@
 $config['auth_require_group_membership_public_ldap'] = 'local_users';
 
 // check for this site names only, for any other - always allowed
-$config['auth_require_group_membership_server_names'] = ['mail.mydomain.com'];
+$config['auth_require_group_membership_server_names'] = array('mail.mydomain.com');
 
 // skip these IP list - always allowed
-$config['auth_require_group_membership_whitelist'] = ['8.8.8.8'];
+$config['auth_require_group_membership_whitelist'] = array('8.8.8.8');
 
 // required group distinguishedName
 $config['auth_require_group_membership_required_dn'] = 'CN=AllowPublicWebMail,CN=Users,DC=domain,DC=local';
