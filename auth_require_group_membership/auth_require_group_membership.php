@@ -21,7 +21,7 @@ class auth_require_group_membership extends rcube_plugin {
         $this->log_file = $this->rc->config->get('auth_require_group_membership_debug_log');
         $this->server_name = strtolower(getenv('HTTP_HOST'));
         $this->remote_addr = getenv('REMOTE_ADDR');
-        $this->is_local = substr($this->remote_addr,0,4) === "192." || substr($this->remote_addr,0,3) === "10.";
+        $this->is_local = (substr($this->remote_addr,0,4) === "192." || substr($this->remote_addr,0,3) === "10.") && (!in_array($this->remote_addr, $this->rc->config->get('auth_require_group_membership_extlist')));
 
         $this->add_hook('authenticate', array($this, 'before_login'));
         $this->add_hook('login_failed', array($this, 'on_login_failed'));
@@ -29,6 +29,7 @@ class auth_require_group_membership extends rcube_plugin {
 
     public function before_login($data){
         $this->write_log('------------ new request to ' . $this->server_name);
+        $this->write_log('is_local = ' . ($this->is_local ? 1 : 0));
         $validates_hosts = $this->rc->config->get('auth_require_group_membership_server_names');
         $this->write_log('checking against ' . join(",", $validates_hosts));
         if($this->server_name == '' || !in_array($this->server_name, $validates_hosts)){
@@ -105,9 +106,12 @@ class auth_require_group_membership extends rcube_plugin {
                 return $this->check_complete($data, false, $this->rc->config->get('auth_require_group_membership_msg_on_server_error'), 'LDAP bind failed');
             };
         }
+
+        $ldap_filter = '(&(sAMAccountName=' . $user . ')' . (!$this->is_local && $this->rc->config->get('auth_require_group_membership_required_dn') !== "" ? '(memberOf=' . $this->rc->config->get('auth_require_group_membership_required_dn') . ')': '') .  '(!(userAccountControl:1.2.840.113556.1.4.803:=2)))';
+        $this->write_log('LDAP filter ' . $ldap_filter);
         $found = $this->ldap->search(
             $this->ldap_config['base_dn'],
-            '(&(sAMAccountName=' . $user . ')' . (!$this->is_local && $this->rc->config->get('auth_require_group_membership_required_dn') !== "" ? '(memberOf=' . $this->rc->config->get('auth_require_group_membership_required_dn') . ')': '') .  '(!(userAccountControl:1.2.840.113556.1.4.803:=2)))',
+            $ldap_filter,
             'sub',
             array('distinguishedName'),
             array(),
@@ -135,7 +139,8 @@ class auth_require_group_membership extends rcube_plugin {
         $data['abort'] = $success !== true;
         $data['error'] = $human_reason;
         if($this->ldap_connected === true) $this->ldap->close();
-        $msg = '[roundcube] ' . ($success === true ? 'SUCCESS ' : 'FAILED ') . ' login to [' . $this->server_name . '] for [' . $data['user']. '] from ' . $this->remote_addr;
+        $msg = '[roundcube] ' . ($success === true ? 'SUCCESS ' : 'FAILED ') . ' login to [' . $this->server_name . '] for [' . $data['user']. '] from ' . $this->remote_addr . " " . $details;
+        $this->write_log($msg);
         $this->rc->write_log($this->rc->config->get('auth_require_group_membership_login_log'), $msg . ' => ' . $details);
         $this->write_log('------------ request complete');
         return $data;

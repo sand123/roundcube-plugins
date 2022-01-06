@@ -10,6 +10,9 @@ $config['auth_require_group_membership_server_names'] = array('mail.mydomain.com
 // skip these IP list - always allowed
 $config['auth_require_group_membership_whitelist'] = array('8.8.8.8');
 
+// consider IP list as external
+$config['auth_require_group_membership_extlist'] = array('10.32.255.9');
+
 // required group distinguishedName
 $config['auth_require_group_membership_required_dn'] = 'CN=AllowPublicWebMail,CN=Users,DC=domain,DC=local';
 
