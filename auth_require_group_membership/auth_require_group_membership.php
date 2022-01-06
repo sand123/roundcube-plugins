@@ -14,28 +14,20 @@ class auth_require_group_membership extends rcube_plugin {
     private $is_local;
     private $log_file;
 
-    private $prepared = false;
+    public function init(){
+        $this->rc = rcmail::get_instance();
 
-    private function prepare(){
-        if($this->prepared) return;
         $this->load_config();
         $this->log_file = $this->rc->config->get('auth_require_group_membership_debug_log');
         $this->server_name = strtolower(getenv('HTTP_HOST'));
         $this->remote_addr = getenv('REMOTE_ADDR');
         $this->is_local = substr($this->remote_addr,0,4) === "192." || substr($this->remote_addr,0,3) === "10.";
-        $this->prepared = true;
-    }
 
-    public function init(){
-        $this->rc = rcmail::get_instance();
         $this->add_hook('authenticate', array($this, 'before_login'));
         $this->add_hook('login_failed', array($this, 'on_login_failed'));
     }
 
     public function before_login($data){
-
-        $this->prepare();
-
         $this->write_log('------------ new request to ' . $this->server_name);
         $validates_hosts = $this->rc->config->get('auth_require_group_membership_server_names');
         $this->write_log('checking against ' . join(",", $validates_hosts));
@@ -132,9 +124,6 @@ class auth_require_group_membership extends rcube_plugin {
     }
 
     public function on_login_failed($data){
-
-        $this->prepare();
-
         $user = isset($data['user']) ? $data['user'] : 'NOT_SET';
         $host = isset($data['host']) ? $data['host'] : 'NOT_SET';
         $code = isset($data['code']) ? $data['code'] : 'NOT_SET';
@@ -143,9 +132,6 @@ class auth_require_group_membership extends rcube_plugin {
     }
 
     public function check_complete($data, $success=true, $human_reason='', $details = 'NOT_SET'){
-
-        $this->prepare();
-
         $data['abort'] = $success !== true;
         $data['error'] = $human_reason;
         if($this->ldap_connected === true) $this->ldap->close();
@@ -160,7 +146,7 @@ class auth_require_group_membership extends rcube_plugin {
         $this->rc->write_log($this->log_file, $msg);
     }
 
-    private function debug_ldap($level, $msg){
+    public function debug_ldap($level, $msg){
         $msg = implode("\n", $msg);
         $this->write_log($msg);
     }
