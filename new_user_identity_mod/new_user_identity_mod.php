@@ -10,7 +10,7 @@
  * @author seregin@soho-service.ru
  * @license GNU GPLv3+
  */
-class new_user_identity extends rcube_plugin
+class new_user_identity_mod extends rcube_plugin
 {
     public $task = 'login';
 
